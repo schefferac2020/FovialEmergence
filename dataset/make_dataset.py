@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
+from tqdm import tqdm
 
 # Constants
 CANVAS_SIZE = 100
@@ -98,16 +99,15 @@ def main(args):
 
     # Generate images
     for label in range(10):
-        for i in range(args.num_images_per_class):
+        for i in tqdm(range(args.num_images_per_class), f"Generating {label} images"):
             canvas = create_cluttered_image(label, digit_dict, scaled=args.scaled)
             filename = os.path.join(args.output_dir, str(label), f"{i}.png")
             cv2.imwrite(filename, canvas)
-            print(f"Saved {filename}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", type=str, default="cluttered_mnist", help="Output directory for cluttered MNIST images")
     parser.add_argument("--scaled", action="store_true", help="Whether to create the scaled version of the dataset")
-    parser.add_argument("--num_images_per_class", type=int, default=100, help="Number of images to create per class")
+    parser.add_argument("--num_images_per_class", type=int, default=1000, help="Number of images to create per class")
     args = parser.parse_args()
     main(args)
