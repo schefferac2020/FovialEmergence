@@ -1,5 +1,5 @@
 # The Emergence of Fovial Image Sampling 
-EECS 553 Final Project
+EECS 553 Final Project based off [this paper](https://arxiv.org/pdf/1611.09430)
 
 
 ## Setup
