@@ -35,7 +35,7 @@ class SingleKernelRetinalGlimpse(nn.Module):
         self.mu = nn.Parameter(grid_points)
         self.sigma = nn.Parameter(torch.ones(self.num_kernels)*sigma_val)
                 
-    def print_picture(self, image):
+    def print_picture(self, image, sc, sz):
         """
         Display the image using OpenCV and overlay the kernel centers (mu) as circles.
         The radius of each circle is proportional to the corresponding sigma value.
@@ -59,18 +59,22 @@ class SingleKernelRetinalGlimpse(nn.Module):
         
         # Upscale the image to 512x512
         H, W = 512, 512
-        image = cv2.resize(image, (W, H), interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, (W, H), interpolation=cv2.INTER_NEAREST)
+        
+        shifted_mu = (s_c - self.mu) * s_z # (num_kernels, 2)
+        shifted_sigma = (self.sigma * s_z).squeeze(0)
+    
         
         # Convert mu and sigma from normalized [-1, 1] to pixel coordinates
-        pixel_mu = (self.mu + 1) * 0.5 * torch.tensor([W, H]).to(self.mu.device)  # Scale to image dimensions
+        pixel_mu = (shifted_mu + 1) * 0.5 * torch.tensor([W, H]).to(shifted_mu.device)  # Scale to image dimensions
         pixel_mu = pixel_mu.detach().cpu().numpy()  # Convert to numpy array
-        pixel_sigma = (self.sigma * 0.5 * max(W, H)).detach().cpu().numpy()  # Scale sigma to pixel dimensions
+        pixel_sigma = (shifted_sigma * 0.5 * max(W, H)).detach().cpu().numpy()  # Scale sigma to pixel dimensions
         
         # Plot kernel centers on the image
         for mu, sigma in zip(pixel_mu, pixel_sigma):
             center = tuple(int(x) for x in mu)  # Convert to (x, y) tuple
             radius = int(sigma)  # Use sigma as radius
-            cv2.circle(image, center, radius, (0, 255, 0), 2)  # Draw circle with green color
+            cv2.circle(image, center, radius, (255, 255, 0), thickness=-1)  # Draw circle with green color
 
         # Display the image
         cv2.imwrite("final_img.png", image)
@@ -107,7 +111,7 @@ class SingleKernelRetinalGlimpse(nn.Module):
         kernels_y = torch.exp(-0.5 * ((grid_y - mu[..., 1].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
         kernels = kernels_x * kernels_y  # (B, num_kernels, H, W)
         
-        kernels /= kernels.sum(dim=(-2, -1), keepdim=True) # Normalize kernel
+        kernels /= (kernels.sum(dim=(-2, -1), keepdim=True)+1e-7) # Normalize kernel
         
         # Compute weighted sum
         output = (U.unsqueeze(1) * kernels).sum(dim=(-2, -1)) # (B, num_kernels)
@@ -138,7 +142,8 @@ if __name__ == "__main__":
     # U = torch.rand(batch_size, *input_dim)
 
     # Control variables
-    s_c = torch.zeros((batch_size, 2))  #torch.rand(batch_size, 2) * 2 - 1  # Positions in [-1, 1]
+    s_c = torch.rand(batch_size, 2) * 2 - 1  # Positions in [-1, 1]
+    print(s_c)
     s_z = torch.ones((batch_size, 1))     # Zoom factor > 1. NO ZOOM
 
     # Glimpse model
@@ -147,4 +152,4 @@ if __name__ == "__main__":
 
     print("Output:", output)  # Single value per image in the batch
     
-    model.print_picture(U[0])
+    model.print_picture(U[0], s_c[0], s_z[0])
