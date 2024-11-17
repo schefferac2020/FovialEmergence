@@ -12,14 +12,23 @@ class SingleKernelRetinalGlimpse(nn.Module):
         super(SingleKernelRetinalGlimpse, self).__init__()
         self.input_dim = input_dim
         
-        self.num_kernels = 144
+        self.num_kernels = 12*12
+        
+        self.initial_glimpse_size = (40, 40)
+        self.sigma_pixel = 1
+        
+        init_sigma_val = self.sigma_pixel/input_dim[0]*2
+        
+        print("The init sigma val:", init_sigma_val)
 
-        self.init_kernel_parameters(sigma_val=.05)
+        self.init_kernel_parameters(sigma_val=init_sigma_val)
 
     def init_kernel_parameters(self, sigma_val):
+        init_glimpse_len = self.initial_glimpse_size[0] / self.input_dim[0]*2
+        
         # Set up the kernels in a grid
         grid_size = int(self.num_kernels ** 0.5)
-        linspace = torch.linspace(-1, 1, grid_size)
+        linspace = torch.linspace(-init_glimpse_len/2, init_glimpse_len/2, grid_size)
         grid_x, grid_y = torch.meshgrid(linspace, linspace, indexing="ij")
         grid_points = torch.stack([grid_x.flatten(), grid_y.flatten()], dim=-1)
         
@@ -105,14 +114,28 @@ class SingleKernelRetinalGlimpse(nn.Module):
 
         return output
 
+
+
+def read_and_convert_image(file_path):
+
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)  # Load as grayscale
+    if image is None:
+        raise ValueError(f"Unable to load image from {file_path}")
+    
+    image_resized = cv2.resize(image, (100, 100), interpolation=cv2.INTER_LINEAR)
+    image_normalized = image_resized / 255.0  # Convert to float in range [0, 1]
+    image_tensor = torch.tensor(image_normalized, dtype=torch.float32).unsqueeze(0)  # Shape: (1, 100, 100)
+    
+    return image_tensor
+
+
 # Example usage
 if __name__ == "__main__":
     # Input image (batch size, height, width)
-    batch_size = 2
-    input_dim = (32, 32)
-    U = torch.rand(batch_size, *input_dim)
-    U[:, :, :] = 0
-    U[:, 14:18, 14:18] = 1
+    batch_size = 1
+    input_dim = (100, 100)
+    U = read_and_convert_image("./dataset/cluttered_mnist/1/4.png")
+    # U = torch.rand(batch_size, *input_dim)
 
     # Control variables
     s_c = torch.zeros((batch_size, 2))  #torch.rand(batch_size, 2) * 2 - 1  # Positions in [-1, 1]
