@@ -10,11 +10,12 @@ import numpy as np
 
 class GlimpseModel(nn.Module):
     '''Take in a batch of images, apply (learnable) gaussian kernels, and output batch of sampled tensors'''
-    def __init__(self, image_shape, num_kernels=144):
+    def __init__(self, image_shape, num_kernels=144, device="cuda:0"):
         super(GlimpseModel, self).__init__()
         
         self.image_shape = image_shape
         self.glimpse_window = (30, 30)
+        self.device = device
         
         self.num_kernels = num_kernels  # chosen by Cheung et al.
         
@@ -31,8 +32,12 @@ class GlimpseModel(nn.Module):
         grid_x, grid_y = torch.meshgrid(linspace, linspace, indexing="ij")
         grid_points = torch.stack([grid_x.flatten(), grid_y.flatten()], dim=-1)
         
-        self.mu = nn.Parameter(grid_points) # num_kernels by 2
-        self.sigma = nn.Parameter(torch.ones(self.num_kernels) * starting_sigma_normalize) # learnable num_kernels
+        mu_init = grid_points # num_kernels by 2
+        sigma_init = torch.ones(self.num_kernels, ) * starting_sigma_normalize # learnable num_kernels
+        
+        self.mu = nn.Parameter(mu_init.to(self.device))
+        self.sigma = nn.Parameter(sigma_init.to(self.device))
+        
     
     # Assumes input_range is (-1, 1)
     def get_normalized_len_from_px_length(self, px_len):
@@ -64,8 +69,9 @@ class GlimpseModel(nn.Module):
         
         # Plot kernel centers on the image
         for mu, sigma in zip(pixel_mu, pixel_sigma):
+            print("radius = ", sigma)
             center = tuple(int(x) for x in mu)  # Convert to (x, y) tuple
-            radius = int(sigma.item())  # Use sigma as radius
+            radius = abs(int(sigma.item()))  # Use sigma as radius
             cv2.circle(image, center, radius, (255, 255, 0), thickness=-1)  # Draw circle with green color
 
         cv2.imwrite(fname, image)
@@ -75,13 +81,10 @@ class GlimpseModel(nn.Module):
     def forward(self, imgs, s_c, s_z):
         B, H, W = imgs.shape
         device = imgs.device
-        print(1)
         
         # Compute Kernel Center and Sigma (Eqn 2/3 from the paper)
         mu = (s_c.unsqueeze(1) - self.mu)*s_z.unsqueeze(1) # (B, num_kernels, 2) 
-        sigma = self.sigma * s_z # (B, num_kernels)
-        print(2)
-        
+        sigma = self.sigma * s_z # (B, num_kernels)        
         # Generate sampling grid
         x = torch.linspace(-1, 1, W, device=device)  # (W,)
         y = torch.linspace(-1, 1, H, device=device)  # (H,)    
@@ -89,25 +92,19 @@ class GlimpseModel(nn.Module):
         
         grid_x = grid_x.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
         grid_y = grid_y.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W) bc all batches and all kernels
-        sigma = sigma.view(B, self.num_kernels, 1, 1) 
-        print(3)
-        
+        sigma = sigma.view(B, self.num_kernels, 1, 1)         
         
         # Compute the gaussian kernel
         kernels_x = torch.exp(-0.5 * ((grid_x - mu[..., 0].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
         kernels_y = torch.exp(-0.5 * ((grid_y - mu[..., 1].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
         kernels = kernels_x * kernels_y  # (B, num_kernels, H, W)
-        
-        print(4)
-        
+                
         # normalize
         kernels /= (kernels.sum(dim=(-2, -1), keepdim=True) + 1e-7)
         
-        print(5)
         
         # Compute the weighted sum
         output = (imgs.unsqueeze(1) * kernels).sum(dim=(-2, -1)) # (B, num_kernels)
-        print(6)
         return output
 
 def read_image(file_pth):
