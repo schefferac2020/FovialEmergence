@@ -10,13 +10,13 @@ import numpy as np
 
 class GlimpseModel(nn.Module):
     '''Take in a batch of images, apply (learnable) gaussian kernels, and output batch of sampled tensors'''
-    def __init__(self, image_shape):
+    def __init__(self, image_shape, num_kernels=144):
         super(GlimpseModel, self).__init__()
         
         self.image_shape = image_shape
         self.glimpse_window = (30, 30)
         
-        self.num_kernels = 144  # chosen by Cheung et al.
+        self.num_kernels = num_kernels  # chosen by Cheung et al.
         
         self.init_kernel_parameters()
     
@@ -75,10 +75,12 @@ class GlimpseModel(nn.Module):
     def forward(self, imgs, s_c, s_z):
         B, H, W = imgs.shape
         device = imgs.device
+        print(1)
         
         # Compute Kernel Center and Sigma (Eqn 2/3 from the paper)
         mu = (s_c.unsqueeze(1) - self.mu)*s_z.unsqueeze(1) # (B, num_kernels, 2) 
         sigma = self.sigma * s_z # (B, num_kernels)
+        print(2)
         
         # Generate sampling grid
         x = torch.linspace(-1, 1, W, device=device)  # (W,)
@@ -88,17 +90,24 @@ class GlimpseModel(nn.Module):
         grid_x = grid_x.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
         grid_y = grid_y.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W) bc all batches and all kernels
         sigma = sigma.view(B, self.num_kernels, 1, 1) 
+        print(3)
+        
         
         # Compute the gaussian kernel
         kernels_x = torch.exp(-0.5 * ((grid_x - mu[..., 0].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
         kernels_y = torch.exp(-0.5 * ((grid_y - mu[..., 1].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
         kernels = kernels_x * kernels_y  # (B, num_kernels, H, W)
         
+        print(4)
+        
         # normalize
         kernels /= (kernels.sum(dim=(-2, -1), keepdim=True) + 1e-7)
         
+        print(5)
+        
         # Compute the weighted sum
         output = (imgs.unsqueeze(1) * kernels).sum(dim=(-2, -1)) # (B, num_kernels)
+        print(6)
         return output
 
 def read_image(file_pth):
