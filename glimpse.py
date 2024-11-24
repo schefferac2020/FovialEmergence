@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import cv2
 import numpy as np
+import heapq
 
 
 class GlimpseModel(nn.Module):
@@ -14,7 +15,7 @@ class GlimpseModel(nn.Module):
         super(GlimpseModel, self).__init__()
         
         self.image_shape = image_shape
-        self.glimpse_window = (30, 30)
+        self.glimpse_window = (50, 50)
         self.device = device
         
         self.num_kernels = num_kernels  # chosen by Cheung et al.
@@ -24,7 +25,7 @@ class GlimpseModel(nn.Module):
     def init_kernel_parameters(self):
         normalized_length = self.get_normalized_len_from_px_length(self.glimpse_window[0])
         
-        starting_sigma_pixels = 1
+        starting_sigma_pixels = 2
         starting_sigma_normalize = self.get_normalized_len_from_px_length(starting_sigma_pixels) 
         
         grid_size = int(np.sqrt(self.num_kernels))
@@ -35,17 +36,23 @@ class GlimpseModel(nn.Module):
         mu_init = grid_points # num_kernels by 2
         sigma_init = torch.ones(self.num_kernels, ) * starting_sigma_normalize # learnable num_kernels
         
-        self.mu = nn.Parameter(mu_init.to(self.device))
-        self.sigma = nn.Parameter(sigma_init.to(self.device))
+        # self.mu = nn.Parameter(mu_init.to(self.device))
+        self.mu = mu_init.to(self.device)
+        # self.sigma = nn.Parameter(sigma_init.to(self.device))
+        self.sigma = sigma_init.to(self.device) # Make this learnable
         
     
     # Assumes input_range is (-1, 1)
     def get_normalized_len_from_px_length(self, px_len):
         return px_len * (2/self.image_shape[0])
 
-    def plot_image(self,fname, image, sc, sz):
+    def plot_image(self,fname, image, sc, sz, sensor_readings):
         if isinstance(image, torch.Tensor):
             image = image.detach().cpu().numpy()
+            
+        k = 10
+        k_largest_indices = heapq.nlargest(k, range(len(sensor_readings)), key=lambda x: sensor_readings[x])
+        print("k_largest_indices", k_largest_indices)
         
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         
@@ -68,11 +75,18 @@ class GlimpseModel(nn.Module):
         pixel_sigma = (shifted_sigma * 0.5 * max(W, H)).detach().cpu().numpy()  # Scale sigma to pixel dimensions
         
         # Plot kernel centers on the image
+        idx = 0
         for mu, sigma in zip(pixel_mu, pixel_sigma):
-            print("radius = ", sigma)
+            # print(idx, "mu = ", mu)
             center = tuple(int(x) for x in mu)  # Convert to (x, y) tuple
             radius = abs(int(sigma.item()))  # Use sigma as radius
-            cv2.circle(image, center, radius, (255, 255, 0), thickness=-1)  # Draw circle with green color
+            
+            color = (255, 255, 0)
+            if idx in k_largest_indices:
+                color = (255, 0, 0)
+            cv2.circle(image, center, radius, color, thickness=1)
+            
+            idx +=1
 
         cv2.imwrite(fname, image)
         
@@ -118,20 +132,20 @@ def read_image(file_pth):
 def main():
     U_old = read_image("./dataset/cluttered_mnist/3/11.png").unsqueeze(0)
     image_shape = (100, 100)
-    model = GlimpseModel(image_shape)
+    model = GlimpseModel(image_shape).to("cuda:0")
     
-    U = torch.zeros((1, 100, 100))
-    U[:, :, :] = U_old.clone().detach()
+    U = torch.zeros((1, 100, 100), device="cuda:0")
+    U[:, 40:60, 40:60] = 1
     batch_size = len(U)
     
-    s_c = torch.rand((batch_size, 2)) * 2 -1
-    s_z = torch.ones((batch_size, 1))
+    s_c = torch.rand((batch_size, 2), device="cuda:0") * 2 -1
+    s_z = torch.ones((batch_size, 1), device="cuda:0")
         
-    output = model(U, s_c, s_z)
-    print("This is the output", output)
+    sensor_reading = model(U, s_c, s_z)
+    print("This is the output", sensor_reading)
     print("Plotting now::")
     for i in range(batch_size):
-        model.plot_image("test{}.png".format(i), U[i], s_c[i], s_z[i])
+        model.plot_image("test{}.png".format(i), U[i], s_c[i], s_z[i], sensor_reading[0])
     
     print("Plotting Finished!")
 
