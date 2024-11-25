@@ -21,6 +21,14 @@ class GlimpseModel(nn.Module):
         self.num_kernels = num_kernels  # chosen by Cheung et al.
         
         self.init_kernel_parameters()
+        
+        
+        x = torch.linspace(-1, 1, image_shape[0], device=self.device)  # (W,)
+        y = torch.linspace(-1, 1, image_shape[1], device=self.device)  # (H,)    
+        grid_y, grid_x = torch.meshgrid(x, y, indexing="ij")
+        
+        self.grid_x = grid_x.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
+        self.grid_y = grid_y.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
     
     def init_kernel_parameters(self):
         normalized_length = self.get_normalized_len_from_px_length(self.glimpse_window[0])
@@ -36,10 +44,10 @@ class GlimpseModel(nn.Module):
         mu_init = grid_points # num_kernels by 2
         sigma_init = torch.ones(self.num_kernels, ) * starting_sigma_normalize # learnable num_kernels
         
-        # self.mu = nn.Parameter(mu_init.to(self.device))
-        self.mu = mu_init.to(self.device)
-        # self.sigma = nn.Parameter(sigma_init.to(self.device))
-        self.sigma = sigma_init.to(self.device) # Make this learnable
+        self.mu = nn.Parameter(mu_init.to(self.device))
+        # self.mu = mu_init.to(self.device)
+        self.sigma = nn.Parameter(sigma_init.to(self.device))
+        # self.sigma = sigma_init.to(self.device) # Make this learnable
         
     
     # Assumes input_range is (-1, 1)
@@ -60,7 +68,7 @@ class GlimpseModel(nn.Module):
         k_largest_indices = real_k_largest_indices
                 
             
-        print("k_largest_indices", k_largest_indices)
+        # print("k_largest_indices", k_largest_indices)
         
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         
@@ -108,25 +116,21 @@ class GlimpseModel(nn.Module):
         mu = (s_c.unsqueeze(1) + self.mu)*s_z.unsqueeze(1) # (B, num_kernels, 2) 
         sigma = self.sigma * s_z # (B, num_kernels)        
         # Generate sampling grid
-        x = torch.linspace(-1, 1, W, device=device)  # (W,)
-        y = torch.linspace(-1, 1, H, device=device)  # (H,)    
-        grid_y, grid_x = torch.meshgrid(x, y, indexing="ij")
-        
-        grid_x = grid_x.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
-        grid_y = grid_y.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
-        sigma = sigma.view(B, self.num_kernels, 1, 1)   
+
+        sigma = sigma.view(B, self.num_kernels, 1, 1)           
         
         # Compute the gaussian kernel
-        kernels_x = torch.exp(-0.5 * ((grid_x- mu[..., 0].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
-        kernels_y = torch.exp(-0.5 * ((grid_y - mu[..., 1].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
+        kernels_x = torch.exp(-0.5 * ((self.grid_x- mu[..., 0].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
+        kernels_y = torch.exp(-0.5 * ((self.grid_y - mu[..., 1].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
+        
         kernels = kernels_x*kernels_y   # (B, num_kernels, H, W)
 
         # normalize
         kernels /= (kernels.sum(dim=(-2, -1), keepdim=True) + 1e-7)
         
-        
         # Compute the weighted sum
         output = (imgs.unsqueeze(1) * kernels).sum(dim=(-2, -1)) # (B, num_kernels)
+        
         return output
 
 def read_image(file_pth):
@@ -143,12 +147,12 @@ def main():
     model = GlimpseModel(image_shape).to("cuda:0")
     
     U = torch.zeros((1, 100, 100), device="cuda:0")
-    # U[:, :, :] = U_old.to("cuda:0")
+    U[:, :, :] = U_old.to("cuda:0")
     # U[:, 40:60, 40:60] = 1
     
-    U[:, 90:100, 0:10] = 1
-    U[:, 15:35, 40:80] = 1
-    U[:, 0:5, 50:60] = 1
+    # U[:, 90:100, 0:10] = 1
+    # U[:, 15:35, 40:80] = 1
+    # U[:, 0:5, 50:60] = 1
     
     batch_size = len(U)
     
