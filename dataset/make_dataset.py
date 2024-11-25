@@ -54,7 +54,7 @@ def add_distractors_to_canvas(num_distractors, canvas, digit_dict, label):
         
     return canvas
 
-def add_target_digit_to_canvas(canvas, digit_dict, label, scaled):
+def add_target_digit_to_canvas(canvas, digit_dict, label, scaled, centered=False):
     target_digit = random.choice(digit_dict[label])
 
     if scaled:
@@ -69,13 +69,17 @@ def add_target_digit_to_canvas(canvas, digit_dict, label, scaled):
 
     # Place the target digit randomly on the canvas
     h, w = target_digit.shape
+    
     x_offset = random.randint(0, CANVAS_SIZE - w)
     y_offset = random.randint(0, CANVAS_SIZE - h)
+    if centered:
+        x_offset = CANVAS_SIZE//2 - w//2
+        y_offset = CANVAS_SIZE//2 - h//2
     canvas[y_offset:y_offset+h, x_offset:x_offset+w] = target_digit
     
     return canvas
 
-def create_cluttered_image(label, digit_dict, scaled=False):
+def create_cluttered_image(label, digit_dict, scaled=False, centered=False):
     canvas = np.zeros((CANVAS_SIZE, CANVAS_SIZE), dtype=np.uint8)  # Blank canvas
 
     # Add distractors
@@ -83,7 +87,7 @@ def create_cluttered_image(label, digit_dict, scaled=False):
     canvas = add_distractors_to_canvas(num_distractors, canvas, digit_dict, label)
     
     # Add target digit
-    canvas = add_target_digit_to_canvas(canvas, digit_dict, label, scaled)
+    canvas = add_target_digit_to_canvas(canvas, digit_dict, label, scaled, centered)
 
     return canvas
 
@@ -100,7 +104,7 @@ def main(args):
     # Generate images
     for label in range(10):
         for i in tqdm(range(args.num_images_per_class), f"Generating {label} images"):
-            canvas = create_cluttered_image(label, digit_dict, scaled=args.scaled)
+            canvas = create_cluttered_image(label, digit_dict, scaled=args.scaled, centered=args.centered)
             filename = os.path.join(args.output_dir, str(label), f"{i}.png")
             cv2.imwrite(filename, canvas)
 
@@ -109,5 +113,10 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default="cluttered_mnist", help="Output directory for cluttered MNIST images")
     parser.add_argument("--scaled", action="store_true", help="Whether to create the scaled version of the dataset")
     parser.add_argument("--num_images_per_class", type=int, default=1000, help="Number of images to create per class")
+    parser.add_argument("--centered", action="store_true", help="Center the target digit in the image")
     args = parser.parse_args()
+    if args.centered:
+        print("CEMTERED option set")
+    if args.scaled:
+        print("SCALED option set")
     main(args)
