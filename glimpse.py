@@ -50,8 +50,16 @@ class GlimpseModel(nn.Module):
         if isinstance(image, torch.Tensor):
             image = image.detach().cpu().numpy()
             
-        k = 10
+        k = 20
         k_largest_indices = heapq.nlargest(k, range(len(sensor_readings)), key=lambda x: sensor_readings[x])
+        real_k_largest_indices = []
+        for ind in k_largest_indices:
+            if sensor_readings[ind] > 0.001:
+                real_k_largest_indices.append(ind)
+                
+        k_largest_indices = real_k_largest_indices
+                
+            
         print("k_largest_indices", k_largest_indices)
         
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
@@ -66,9 +74,9 @@ class GlimpseModel(nn.Module):
         H, W = 512, 512
         image = cv2.resize(image, (W, H), interpolation=cv2.INTER_NEAREST)
         
-        shifted_mu = (sc - self.mu) * sz # (num_kernels, 2)
+        shifted_mu = (sc + self.mu) * sz # (num_kernels, 2)
         shifted_sigma = (self.sigma * sz).squeeze(0) # (num_kernels,)
-    
+            
         # Convert mu and sigma from normalized [-1, 1] to pixel coordinates
         pixel_mu = (shifted_mu + 1) * 0.5 * torch.tensor([W, H]).to(shifted_mu.device)  # Scale to image dimensions
         pixel_mu = pixel_mu.detach().cpu().numpy()  # Convert to numpy array
@@ -85,7 +93,7 @@ class GlimpseModel(nn.Module):
             if idx in k_largest_indices:
                 color = (255, 0, 0)
             cv2.circle(image, center, radius, color, thickness=1)
-            
+                        
             idx +=1
 
         cv2.imwrite(fname, image)
@@ -97,22 +105,22 @@ class GlimpseModel(nn.Module):
         device = imgs.device
         
         # Compute Kernel Center and Sigma (Eqn 2/3 from the paper)
-        mu = (s_c.unsqueeze(1) - self.mu)*s_z.unsqueeze(1) # (B, num_kernels, 2) 
+        mu = (s_c.unsqueeze(1) + self.mu)*s_z.unsqueeze(1) # (B, num_kernels, 2) 
         sigma = self.sigma * s_z # (B, num_kernels)        
         # Generate sampling grid
         x = torch.linspace(-1, 1, W, device=device)  # (W,)
         y = torch.linspace(-1, 1, H, device=device)  # (H,)    
-        grid_x, grid_y = torch.meshgrid(x, y, indexing="ij")
+        grid_y, grid_x = torch.meshgrid(x, y, indexing="ij")
         
         grid_x = grid_x.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
-        grid_y = grid_y.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W) bc all batches and all kernels
-        sigma = sigma.view(B, self.num_kernels, 1, 1)         
+        grid_y = grid_y.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
+        sigma = sigma.view(B, self.num_kernels, 1, 1)   
         
         # Compute the gaussian kernel
-        kernels_x = torch.exp(-0.5 * ((grid_x - mu[..., 0].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
+        kernels_x = torch.exp(-0.5 * ((grid_x- mu[..., 0].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
         kernels_y = torch.exp(-0.5 * ((grid_y - mu[..., 1].view(B, self.num_kernels, 1, 1)) ** 2) / sigma ** 2)
-        kernels = kernels_x * kernels_y  # (B, num_kernels, H, W)
-                
+        kernels = kernels_x*kernels_y   # (B, num_kernels, H, W)
+
         # normalize
         kernels /= (kernels.sum(dim=(-2, -1), keepdim=True) + 1e-7)
         
@@ -135,14 +143,24 @@ def main():
     model = GlimpseModel(image_shape).to("cuda:0")
     
     U = torch.zeros((1, 100, 100), device="cuda:0")
-    U[:, 40:60, 40:60] = 1
+    # U[:, :, :] = U_old.to("cuda:0")
+    # U[:, 40:60, 40:60] = 1
+    
+    U[:, 90:100, 0:10] = 1
+    U[:, 15:35, 40:80] = 1
+    U[:, 0:5, 50:60] = 1
+    
     batch_size = len(U)
+    
     
     s_c = torch.rand((batch_size, 2), device="cuda:0") * 2 -1
     s_z = torch.ones((batch_size, 1), device="cuda:0")
-        
+    
+    # s_c[0, 0] = -0.5
+    # s_c[0, 1] = 0.5
+            
     sensor_reading = model(U, s_c, s_z)
-    print("This is the output", sensor_reading)
+    # print("This is the output", sensor_reading)
     print("Plotting now::")
     for i in range(batch_size):
         model.plot_image("test{}.png".format(i), U[i], s_c[i], s_z[i], sensor_reading[0])
