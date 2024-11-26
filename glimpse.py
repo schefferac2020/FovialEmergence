@@ -99,7 +99,7 @@ class GlimpseModel(nn.Module):
             
             color = (255, 255, 0)
             if idx in k_largest_indices:
-                color = (255, 0, 0)
+                color = (0, 0, 255)
             cv2.circle(image, center, radius, color, thickness=1)
                         
             idx +=1

@@ -84,7 +84,7 @@ def create_cluttered_image(label, digit_dict, scaled=False, centered=False):
 
     # Add distractors
     num_distractors = random.randint(*NUM_DISTRACTORS_RANGE)
-    canvas = add_distractors_to_canvas(num_distractors, canvas, digit_dict, label)
+    # canvas = add_distractors_to_canvas(num_distractors, canvas, digit_dict, label)
     
     # Add target digit
     canvas = add_target_digit_to_canvas(canvas, digit_dict, label, scaled, centered)
