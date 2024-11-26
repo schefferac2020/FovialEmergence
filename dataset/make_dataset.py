@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--scaled", action="store_true", help="Whether to create the scaled version of the dataset")
     parser.add_argument("--num_images_per_class", type=int, default=1000, help="Number of images to create per class")
     parser.add_argument("--centered", action="store_true", help="Center the target digit in the image")
-    parser.add_argument("--no_distactors", action="store_true", help="Makes the created have no distractors")
+    parser.add_argument("--no_distractors", action="store_true", help="Makes the created have no distractors")
     args = parser.parse_args()
     if args.centered:
         print("CEMTERED option set")
