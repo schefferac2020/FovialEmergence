@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 # Constants
 CANVAS_SIZE = 100
-NUM_DISTRACTORS_RANGE = (0, 20)
+NUM_DISTRACTORS_RANGE = (0, 10)
 DIGIT_SIZE_RANGE = (0.33, 3.0)
 
 def preprocess_mnist(mnist_dataset):
@@ -79,12 +79,13 @@ def add_target_digit_to_canvas(canvas, digit_dict, label, scaled, centered=False
     
     return canvas
 
-def create_cluttered_image(label, digit_dict, scaled=False, centered=False):
+def create_cluttered_image(label, digit_dict, scaled=False, centered=False, no_distractors=False):
     canvas = np.zeros((CANVAS_SIZE, CANVAS_SIZE), dtype=np.uint8)  # Blank canvas
 
     # Add distractors
     num_distractors = random.randint(*NUM_DISTRACTORS_RANGE)
-    # canvas = add_distractors_to_canvas(num_distractors, canvas, digit_dict, label)
+    if not no_distractors:
+        canvas = add_distractors_to_canvas(num_distractors, canvas, digit_dict, label)
     
     # Add target digit
     canvas = add_target_digit_to_canvas(canvas, digit_dict, label, scaled, centered)
@@ -104,7 +105,7 @@ def main(args):
     # Generate images
     for label in range(10):
         for i in tqdm(range(args.num_images_per_class), f"Generating {label} images"):
-            canvas = create_cluttered_image(label, digit_dict, scaled=args.scaled, centered=args.centered)
+            canvas = create_cluttered_image(label, digit_dict, scaled=args.scaled, centered=args.centered, no_distractors=args.no_distractors)
             filename = os.path.join(args.output_dir, str(label), f"{i}.png")
             cv2.imwrite(filename, canvas)
 
@@ -114,6 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--scaled", action="store_true", help="Whether to create the scaled version of the dataset")
     parser.add_argument("--num_images_per_class", type=int, default=1000, help="Number of images to create per class")
     parser.add_argument("--centered", action="store_true", help="Center the target digit in the image")
+    parser.add_argument("--no_distactors", action="store_true", help="Makes the created have no distractors")
     args = parser.parse_args()
     if args.centered:
         print("CEMTERED option set")
