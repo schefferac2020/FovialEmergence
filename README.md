@@ -1,5 +1,12 @@
 # The Emergence of Fovial Image Sampling 
-An implementation of [this paper](https://arxiv.org/pdf/1611.09430)
+An implementation of [this paper](https://arxiv.org/pdf/1611.09430) for emergent foviation of an image sampling lattice for simple recognition in cluttered environments.
+
+![](./readme/time_example.png)
+
+## Emergent Fovial Lattice 
+The following shows the sampling lattice (learned through backpropigation) evolving as the algorithm is trained on a [*Cluttered MNIST dataset*](./dataset/). The circles represent 144 unique "receptive fields" where the radius of the circles represent the standard deviation of a gaussian kernel used to sample the image. The larger the circle, the larger the receptive field.  
+
+![](./readme/output_video.gif)
 
 
 ## Setup
@@ -17,19 +24,5 @@ pip install -r requirements.txt
 ## Create Cluttered MNIST Dataset
 ```bash
 cd dataset
-python3 make_dataset.py
+python3 make_dataset.py -h
 ```
-
-## TODO
-- [x] Create glimpse module with gaussian kernel
-- [ ] Get Simple RNN to work with just MNIST (not using our glimpse module)
-- [ ] Get RNN working using glimpse module (not updating the sigmas or mus)
-- [ ] Get RNN working using glimpse module while updating all parameters
-- [ ] Look into if we have to do some normalization thing?
-
-
-## Potential Future Steps
-- [ ] Moving images?
-- [ ] Use some other dataset besides MNIST
-- [ ] Could extend to use Reinforcement Learning
-- [ ] Use a special that can change the number of kernels over time. 
