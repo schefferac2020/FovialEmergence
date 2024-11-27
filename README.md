@@ -1,5 +1,10 @@
 # The Emergence of Fovial Image Sampling 
-An implementation of [this paper](https://arxiv.org/pdf/1611.09430) for emergent foviation of an image sampling lattice for simple recognition in cluttered environments.
+An implementation of [this paper](https://arxiv.org/pdf/1611.09430). An agent with limited photoreceptors 
+is tasked with recognizing digits in cluttered environments in as few "glimpses" as possible.
+Trained with backpropigation, the agent learns an emergent sampling lattice with higher precision at the center 
+of the gaze. This learned lattice closely resembles the density of ganglion cells
+in the primate retina.
+
 
 ![](./readme/time_example.png)
 
