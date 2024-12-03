@@ -102,8 +102,10 @@ class GlimpseModelFaster(nn.Module):
         sigma_init = torch.ones(self.num_kernels, ) * init_sigma_px #  (num_kernels, )
         
         # Make mu and sigma learnable 
-        self.mu = nn.Parameter(mu_init.to(self.device))
-        self.sigma = nn.Parameter(sigma_init.to(self.device))
+        # self.mu = nn.Parameter(mu_init.to(self.device))
+        self.mu = mu_init.to(self.device)
+        # self.sigma = nn.Parameter(sigma_init.to(self.device))
+        self.sigma = sigma_init.to(self.device)
         
         
     def get_2D_gaussian_kernel(self, len_pixels, sigma_pixels):
@@ -203,7 +205,9 @@ class GlimpseModel(nn.Module):
         
         # Make mu and sigma learnable 
         self.mu = nn.Parameter(mu_init.to(self.device))
+        # self.mu = mu_init.to(self.device)
         self.sigma = nn.Parameter(sigma_init.to(self.device))
+        # self.sigma = sigma_init.to(self.device)
         
     def forward(self, imgs, s_c, s_z):
         '''
