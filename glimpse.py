@@ -39,13 +39,15 @@ def plot_glimpse_image(fname, image, mu, sigma, sc, sz, sensor_readings):
     upscale_factor= H/image.shape[0]
     image = cv2.resize(image, (W, H), interpolation=cv2.INTER_NEAREST)
     
+    # print(sz.shape)
+    # print((sc + mu).shape)
     shifted_mu = (sc + mu) * sz # (num_kernels, 2)
     shifted_sigma = (sigma * sz).squeeze(0) # (num_kernels,)
         
     # Convert mu and sigma from normalized [-1, 1] to pixel coordinates
     pixel_mu = (shifted_mu + 1) * 0.5 * torch.tensor([W, H]).to(shifted_mu.device)  # Scale to image dimensions
     pixel_mu = pixel_mu.detach().cpu().numpy()  # Convert to numpy array
-    pixel_sigma = (shifted_sigma*upscale_factor*10).detach().cpu().numpy()  # Scale sigma to pixel dimensions
+    pixel_sigma = (shifted_sigma*upscale_factor*1).detach().cpu().numpy()  # Scale sigma to pixel dimensions
     
     # Plot kernel centers on the image
     idx = 0
@@ -201,7 +203,7 @@ class GlimpseModel(nn.Module):
         mu_init = grid_points # (num_kernels, 2)
         
         # 2. Initialize the sigmas for each kernel (pixel units)
-        sigma_init = torch.ones(self.num_kernels, ) * init_sigma_px /10 #  (num_kernels, )
+        sigma_init = torch.ones(self.num_kernels, ) * init_sigma_px /1.0 #  (num_kernels, )
         
         # Make mu and sigma learnable 
         self.mu = nn.Parameter(mu_init.to(self.device))
@@ -219,7 +221,7 @@ class GlimpseModel(nn.Module):
         
         # Compute Kernel Center and Sigma (Eqn 2/3 from the paper)
         mu = (s_c.unsqueeze(1) + self.mu)*s_z.unsqueeze(1) # (B, num_kernels, 2) 
-        sigma = get_normalized_len_from_px_length(self.sigma*10) * s_z # (B, num_kernels)        
+        sigma = get_normalized_len_from_px_length(self.sigma*1.0) * s_z # (B, num_kernels)        
 
         sigma = sigma.view(B, self.num_kernels, 1, 1)           
         
@@ -250,14 +252,14 @@ def main():
     
     batch_size = 16
     images = torch.zeros((batch_size, 100, 100), device=device)
-    # U[:, :, :] = read_image("./dataset/cluttered_mnist/3/11.png").unsqueeze(0).to("cpu")
+    images[:] = read_image("./dataset/cluttered_mnist/3/11.png").unsqueeze(0).to("cpu")
     images[:, 90:100, 0:10] = 1
     images[:, 15:35, 40:80] = 1
     images[:, 0:5, 50:60] = 1
     
     # Random Commands
     s_c = torch.rand((batch_size, 2), device=device) * 2 -1
-    s_z = torch.ones((batch_size, 1), device=device)
+    s_z = torch.ones((batch_size, 1), device=device) #- 0.5 #(torch.rand((batch_size, 1), device=device)/3)
     
     # Test slow model
     slow_model = GlimpseModel(image_shape).to(device)
