@@ -108,7 +108,8 @@ for epoch in range(num_epochs):
         # Initialize the hidden state and center
         h0 = torch.zeros(num_layers, batch_size, hidden_size).to(images.device)
         
-        next_actions = torch.zeros((batch_size, 2), device=images.device)
+        next_actions = torch.zeros((batch_size, 3), device=images.device)
+        # next_actions[:, 2]=1 # Set the s_z to be 1
 
         optimizer.zero_grad()
 
@@ -123,7 +124,9 @@ for epoch in range(num_epochs):
             if (i + 1) % 100 == 0:
                 sz = torch.ones((1), device=device)
                 img = images[0][0]
-                sc = next_actions[0] 
+                sc = next_actions[0][0:2] 
+                # sz = (actions[:, 2] + 1)*3
+                sz = (next_actions[0][2] + 1)
                 img_name = f"pictures/iter{i+1}_step{step}.png"
                 plot_glimpse_image(img_name, img, model.eyes.mu, model.eyes.sigma, sc, sz, sensor_readings[0])
                 
@@ -158,7 +161,8 @@ for epoch in range(num_epochs):
             # create movie
             if create_movie:
                 frame_file = os.path.join(video_path, f"frame_{video_frame}.png")
-                plot_glimpse_image(frame_file, vid_background_img, model.eyes.mu, model.eyes.sigma, torch.zeros((2), device=device), sz, torch.zeros(144))
+                
+                plot_glimpse_image(frame_file, vid_background_img, model.eyes.mu, model.eyes.sigma, torch.zeros((2), device=device), torch.ones((1), device=device), torch.zeros(144))
                 video_frame += 1
     
     # Save the model checkpoint

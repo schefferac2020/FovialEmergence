@@ -19,7 +19,7 @@ class MNISTRNN(nn.Module):
         # RNN to process the crops
         self.rnn = nn.RNN(num_kernels, hidden_size, num_layers, batch_first=True)
         self.fc_class = nn.Linear(hidden_size, num_classes)  # Class prediction
-        self.fc_action = nn.Linear(hidden_size, 2)  # Next crop center prediction #TODO: might have to change this back to 2 for older models than Dec 3
+        self.fc_action = nn.Linear(hidden_size, 3)  # Next crop center prediction #TODO: might have to change this back to 2 for older models than Dec 3
         
         self.eyes = GlimpseModel((image_size, image_size), num_kernels, device=device)
         
@@ -35,12 +35,15 @@ class MNISTRNN(nn.Module):
         batch_size = len(images)
         
         
-        sz = torch.ones((batch_size, 1), device=self.device)
+        # sz = torch.ones((batch_size, 1), device=self.device)
+        sc = actions[:, 0:2]
+        sz = (actions[:, 2] + 1) #(-1, 1) --> (0, 2) 
+        sz = sz.view((batch_size, 1))
 
         
          # TODO: This is the thing that we need to control.
         input = images.squeeze(1)
-        output_tensor = self.eyes(input, actions, sz) # (B, 144)
+        output_tensor = self.eyes(input, sc, sz) # (B, 144)
         
         sensor_readings = output_tensor
 
@@ -54,5 +57,6 @@ class MNISTRNN(nn.Module):
         # Predict class and next crop center
         class_pred = self.fc_class(out[:, -1, :])  # Class prediction
         action_pred = torch.tanh(self.fc_action(out[:, -1, :]))  # Action (next crop center)
+        
 
         return class_pred, action_pred, hn, sensor_readings
