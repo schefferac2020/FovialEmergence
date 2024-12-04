@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
 import random
+import numpy as np
 
 
 SEED = 42
@@ -49,6 +50,11 @@ class ClutteredMNISTDataset(Dataset):
 
 def get_dataloaders(batch_size=64):
     '''gets the train and test dataloaders'''
+    
+    random.seed(SEED)  # Python random module
+    np.random.seed(SEED)  # NumPy random module
+    torch.manual_seed(SEED)  # PyTorch random module
+    torch.cuda.manual_seed_all(SEED)
 
     # Define transforms for the dataset
     transform = transforms.Compose([
