@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 # Constants
 CANVAS_SIZE = 100
-NUM_DISTRACTORS_RANGE = (0, 10)
+NUM_DISTRACTORS_RANGE = (0, 20)
 DIGIT_SIZE_RANGE = (0.33, 3.0)
 
 def preprocess_mnist(mnist_dataset):
