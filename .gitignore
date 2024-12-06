@@ -1,2 +1,4 @@
 __pycache__/
 models/
+dataset/cluttered_mnist
+dataset/raw_mnist
